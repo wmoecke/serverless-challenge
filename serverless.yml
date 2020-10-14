@@ -1,14 +1,24 @@
+##
+# Parâmetros que devem ser alterados de acordo com o perfil criado no serverless.com
+app: api
+tenant: wmoecke
 service: serverless-challenge
-
-frameworkVersion: ">=1.1.0 <2.0.0"
+frameworkVersion: "2"
 
 provider:
   name: aws
-  runtime: nodejs4.3 #nodejs6.10, python2.7, python3.6
-  profile: hackathon
-  region: us-east-1
+  runtime: nodejs12.x
+##
+# region deve ser alterado de acordo com o perfil criado no AWS  
+  region: sa-east-1
   environment:
     DYNAMODB_TABLE: ${self:service}-${opt:stage, self:provider.stage}
+##
+# Pode ser necessário também alterar o nome do Bucket, caso haja conflito com algum nome existente
+    S3_BUCKET: images-instagrao
+##
+# Foram concedidas as permissões para o Bucket e DynamoDB, conforme a documentação do AWS. Contudo, 
+# verificou-se em alguns casos que era necessário tornar o Bucket acessível publicamente através do S3 Console
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -18,30 +28,64 @@ provider:
         - dynamodb:PutItem
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
-      Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE}"
+        - s3:GetObject
+      Resource: 
+        - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE}"
+        - "arn:aws:s3:::self:provider.environment.S3_BUCKET/*"
 
+##
+# A partir daqui declaramos as funções lambda que são implementadas no handler.js
 functions:
-  extractMetadata:
-    handler: handler.extractMetadata
+  ExtractMetadata:
+    handler: handler.ExtractMetadata
     description:
     memorySize: 128
     timeout: 30
     events:
       - s3:
-          bucket: bucketname # Escolha o nome do seu bucket que deve ser único
+          bucket: ${self:provider.environment.S3_BUCKET}
           event: s3:ObjectCreated:*
           rules:
-            - prefix: uploads/
+            - prefix: upload/
             - suffix: .jpg
-  getMetadata:
-    handler: handler.getMetadata
+      - s3:
+          bucket: ${self:provider.environment.S3_BUCKET}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: upload/
+            - suffix: .png
+
+  GetMetadata:
+    handler: handler.GetMetadata
     description:
     memorySize: 128
     timeout: 30
     events:
       - http:
-          path: images/{s3objectkey}
+          path: getMetadata/{s3objectkey}
           method: get
+          cors: true
+
+  GetImage:
+    handler: handler.GetImage
+    description:
+    memorySize: 128
+    timeout: 30
+    events:
+      - http:
+          path: getImage/{s3objectkey}
+          method: get
+          cors: true
+
+  InfoImages:
+    handler: handler.InfoImages
+    description:
+    memorySize: 128
+    timeout: 30
+    events:
+      - http:
+          path: infoImages/
+          method: get       
           cors: true
 
 resources:
@@ -50,12 +94,10 @@ resources:
       Type: 'AWS::DynamoDB::Table'
       Properties:
         AttributeDefinitions:
-          -
-            AttributeName: s3objectkey
+          - AttributeName: s3objectkey
             AttributeType: S
         KeySchema:
-          -
-            AttributeName: s3objectkey
+          - AttributeName: s3objectkey
             KeyType: HASH
         ProvisionedThroughput:
           ReadCapacityUnits: 1
