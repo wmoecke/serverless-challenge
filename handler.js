@@ -114,7 +114,7 @@ module.exports.ExtractMetadata = (event, context, callback) => {
 					callback(null, {
 						"statusCode": 200,
 						"headers": {
-							"Content-Type": "image/png",
+							"Content-Type": "image/" + ext.slice(1),
 							"Content-Length": data.Item.size,
 							"Content-Disposition": "attachment; filename=" + filename
 						},
@@ -161,8 +161,8 @@ module.exports.ExtractMetadata = (event, context, callback) => {
 			});
 			
 			var resp = {
-				MaiorImagem: decodeURIComponent(sizes[sizes.length - 1].key.replace(/\+/g, " ")),
-				MenorImagem: decodeURIComponent(sizes[0].key.replace(/\+/g, " ")),
+				MaiorImagem: { Nome: decodeURIComponent(sizes[sizes.length - 1].key.replace(/\+/g, " ")), Tamanho: sizes[sizes.length - 1].size },
+				MenorImagem: { Nome: decodeURIComponent(sizes[0].key.replace(/\+/g, " ")), Tamanho: sizes[0].size },
 				TiposSalvos: imgTypes.sort(function(a, b) {return a.Quantidade - b.Quantidade})
 			};
 			
